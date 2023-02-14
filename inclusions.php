@@ -18,16 +18,36 @@ if (! isset($_SESSION['name'])) {
 }
 }
 
-echo('<link rel="stylesheet" href="vendor\twbs\bootstrap\dist\css\bootstrap.min.css">');
-/*<link rel="stylesheet" 
+function validatePos() {
+    for($i=1; $i<=9; $i++) {
+        if ( ! isset($_POST['year'.$i]) ) continue;
+        if ( ! isset($_POST['desc'.$i]) ) continue;
+        $year = $_POST['year'.$i];
+        $desc = $_POST['desc'.$i];
+        if ( strlen($year) == 0 || strlen($desc) == 0 ) {
+            //$_SESSION['error'] = "All fields are required";
+            //return False;
+            return "All fields are required";
+        }
+
+        if ( ! is_numeric($year) ) {
+            //$_SESSION['error'] = "Position year must be numeric";
+            //return False;
+            return "Position year must be numeric";
+        }
+    }
+    return True;
+}
+
+echo('<link rel="stylesheet" 
     href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" 
     integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" 
-    crossorigin="anonymous">
+    crossorigin="anonymous">');
 
-<link rel="stylesheet" 
+echo('<link rel="stylesheet" 
     href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" 
     integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" 
-    crossorigin="anonymous">*/ // if I want to use it someday
+    crossorigin="anonymous">'); // if I want to use it someday
 
     echo('<script
   src="https://code.jquery.com/jquery-3.2.1.js"
