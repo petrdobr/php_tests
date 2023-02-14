@@ -1,6 +1,5 @@
 <?php
-require_once "pdo.php";
-session_start();
+require_once "inclusions.php";
 if (isset($_GET['done'])) {
     header("Location: index.php");
     return;
@@ -13,15 +12,17 @@ if ( ! isset($_GET['profile_id']) ) {
   }
 //fetch data to show record
 $stmt = $pdo->prepare("SELECT * FROM profile where profile_id = :id");
-$stmt->execute(array(":id" => $_GET['profile_id']));
+$stmt->execute(array(":id" => $_REQUEST['profile_id']));
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt = $pdo->prepare("SELECT * FROM position where profile_id = :id order by rank");
+$stmt->execute(array(":id" => $_REQUEST['profile_id']));
+$rows_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
 ?>
     <html>
 <head>
     <title>
         Petr Dobrokhotov Resume Registry
     </title>
-    <link rel="stylesheet" href="vendor\twbs\bootstrap\dist\css\bootstrap.min.css">
 </head>
 <body>
 <div style="padding-left: 4%;">
@@ -39,6 +40,16 @@ $summy = htmlentities($row['summary']);
 <p>E-mail: <?= $email ?></p>
 <p>Headline: <?= $hline ?></p>
 <p>Summary: <br><?= $summy ?></p>
+<?php 
+if ($rows_pos) {
+echo('<p>Positions: <br><?= $summy ?></p>');
+echo('<p><ul>');
+foreach($rows_pos as $r) {
+    echo('<li>'.htmlentities($r['year']).': '.htmlentities($r['description']).'</li>');
+}
+echo('</ul></p>');
+}
+?>
 <a href="view.php?profile_id=<?= $_GET['profile_id'] ?>&done=yes">Done</a>
 </div>
 </body>

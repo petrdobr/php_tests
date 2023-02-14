@@ -169,7 +169,7 @@ if ( isset($rows_pos)) {
         <br><p>Year: <input type="text" name="year'.$n.'" value="'.$edit_year.'" />
         <input type="button" value="-"
             onclick="$(\'#position'.$n.'\').remove();return false;"></p>
-        <textarea name="desc'.$n.'" rows="8" cols="80">'.$edit_year.'</textarea></div>');
+        <textarea name="desc'.$n.'" rows="8" cols="80">'.$edit_desc.'</textarea></div>');
     }
 }
 
