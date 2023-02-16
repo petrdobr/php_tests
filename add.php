@@ -32,7 +32,14 @@ if (isset($_POST['first_name']) & isset($_POST['last_name'])
             header ('location: add.php');
             return;
         }
-            //everything seems ok
+        $msg = validateEdu();
+        if (is_string($msg)) {
+            $_SESSION['error'] = $msg;
+            header ('location: add.php');
+            return;
+        }
+        
+            //everything seems ok, insert profile data
             $stmt = $pdo->prepare('INSERT INTO profile
         (user_id,first_name,last_name,email,headline,summary) VALUES (:uid, :fn, :ln, :em, :hd, :sm)');
             $stmt->execute(
@@ -64,6 +71,28 @@ if (isset($_POST['first_name']) & isset($_POST['last_name'])
             );
             $rank++;
             }
+            //now insert education data   
+            $rank = 1; //start again
+            for($i=1; $i<=9;$i++) {
+                if ( ! isset($_POST['edu_year'.$i]) ) continue;
+                if ( ! isset($_POST['edu_school'.$i]) ) continue;
+                $year = $_POST['edu_year'.$i];
+                $school = $_POST['edu_school'.$i];
+                $inst_id = get_inst_id($pdo,$school);
+
+                //insert data
+                $stmt = $pdo->prepare('INSERT INTO education
+                (profile_id, institution_id, rank, year) 
+            VALUES ( :pid, :inst, :rank, :year)');
+            $stmt->execute(array(
+                ':pid' => $profile_id,
+                ':inst' => $inst_id,
+                ':rank' => $rank,
+                ':year' => $year)
+            );
+            $rank++;
+            }
+
             
             $_SESSION['success'] = "Record added";
             header("Location: index.php");
@@ -94,14 +123,20 @@ flashMessage();
 <p>Summary:<br>
 <textarea name="summary" rows="8" cols="80"></textarea></p>
 <p>
+Education: <input type="submit" id="addEdu" value="+">
+</p>
+<p>
 Position: <input type="submit" id="addPos" value="+">
 </p>
+<div id="edu_fields"></div>
+<p></p>
 <div id="position_fields"></div>
 <p></p>
 <p><input type="submit" value="Add"/>
 <input type="submit" name="cancel" value="Cancel"/></p>
 <script>
 countPos = 0;
+countEdu = 0;
 // http://stackoverflow.com/questions/17650776/add-remove-html-inside-div-using-javascript
 $(document).ready(function(){
     window.console && console.log('Document ready called');
@@ -123,6 +158,37 @@ $(document).ready(function(){
             </div>');
     });
 });
+$('#addEdu').click(function(event){
+        event.preventDefault();
+        if ( countEdu >= 9 ) {
+            alert("Maximum of nine education entries exceeded");
+            return;
+        }
+        countEdu++;
+        window.console && console.log("Adding education "+countEdu);
+
+        // Grab some HTML with hot spots and insert into the DOM
+        var source  = $("#edu-template").html();
+        $('#edu_fields').append(source.replace(/@COUNT@/g,countEdu));
+
+        // Add the even handler to the new ones
+        $('.school').autocomplete({
+            source: "school.php"
+        });
+
+    });
+
+    $('.school').autocomplete({
+        source: "school.php"
+    });
+</script>
+<script id="edu-template" type="text">
+  <div id="edu@COUNT@">
+    <p>Year: <input type="text" name="edu_year@COUNT@" value="" />
+    <input type="button" value="-" onclick="$('#edu@COUNT@').remove();return false;"><br>
+    <p>School: <input type="text" size="80" name="edu_school@COUNT@" class="school" value="" />
+    </p>
+  </div>
 </script>
 </form>
 </div>

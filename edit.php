@@ -49,7 +49,13 @@ if (isset($_POST['first_name']) & isset($_POST['last_name'])
             header ("location: edit.php?profile_id=".$_REQUEST['profile_id']);
             return;
         }
-            //everything seems ok
+        $msg = validateEdu();
+        if (is_string($msg)) {
+            $_SESSION['error'] = $msg;
+            header ("location: edit.php?profile_id=".$_REQUEST['profile_id']);
+            return;
+        }
+            //everything seems ok; update profile first
             $sql = "UPDATE profile SET first_name = :fn,
             last_name = :ln, email = :em, headline = :hi, summary = :sm
             WHERE profile_id = :id";
@@ -76,7 +82,6 @@ if (isset($_POST['first_name']) & isset($_POST['last_name'])
                         $sql = "DELETE FROM position WHERE rank = :rank AND profile_id = :id";
                         $stmt = $pdo->prepare($sql);
                         $stmt->execute(array(':rank' => $i, ':id' => $_REQUEST['profile_id']));
-                        continue;
                     } else { //record exists in DB and exists on edit page == UPDATE position (even if the same)
                         $year = $_POST['year'.$i];
                         $desc = $_POST['desc'.$i];
@@ -87,8 +92,8 @@ if (isset($_POST['first_name']) & isset($_POST['last_name'])
                         ':yr' => $year,
                         ':ds' => $desc,
                         ':rank' => $i, 
-                        ':id' => $_REQUEST['profile_id'])
-                    );}
+                        ':id' => $_REQUEST['profile_id']));
+                }
                 } else {
                     if ( ! isset($_POST['year'.$i]) ) continue; //skip actions if DB record absent and no data inserted
                     if ( ! isset($_POST['desc'.$i]) ) continue;
@@ -109,6 +114,53 @@ if (isset($_POST['first_name']) & isset($_POST['last_name'])
                 }
             $rank++;
             }
+            //now insert education data with checking if data is already there
+            $rank = 1;
+            for($i=1; $i<=9;$i++) {
+                $stmt_check = $pdo->prepare('SELECT 1 from education WHERE rank = :rank AND profile_id = :id');
+                $stmt_check->execute(array(':rank' => $i, ':id' => $_REQUEST['profile_id']));
+                $rank_exists = $stmt_check->fetch(PDO::FETCH_ASSOC); //if no record should be FALSE
+                if ($rank_exists) {
+                    //record exists in DB but was deleted from edit page == DELETE position
+                    if ( ! isset($_POST['edu_year'.$i]) && ! isset($_POST['edu_school'.$i])) {
+                        $sql = "DELETE FROM education WHERE rank = :rank AND profile_id = :id";
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute(array(':rank' => $i, ':id' => $_REQUEST['profile_id']));
+                    } else { //record exists in DB and exists on edit page == UPDATE position (even if the same)
+                        $year = $_POST['edu_year'.$i];
+                        $school = $_POST['edu_school'.$i];
+                        $inst_id = get_inst_id($pdo,$school); //fetch inst id as ass array
+                        //now on to actual update
+                        $sql = "UPDATE education SET year = :yr, institution_id = :iid 
+                        WHERE rank = :rank AND profile_id = :id";
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute(array(
+                        ':yr' => $year,
+                        ':iid' => $inst_id,
+                        ':rank' => $i, 
+                        ':id' => $_REQUEST['profile_id'])
+                    );}
+                } else {
+                    if ( ! isset($_POST['edu_year'.$i]) ) continue; //skip actions if DB record absent and no data inserted
+                    if ( ! isset($_POST['edu_school'.$i]) ) continue;
+                    //DB record is absent but there is new data on edit page == INSERT DATA
+                    if (isset($_POST['edu_year'.$i]) && isset($_POST['edu_school'.$i])) {
+                        $year = $_POST['edu_year'.$i];
+                        $school = $_POST['edu_school'.$i];
+                        $inst_id = get_inst_id($pdo,$school); //fetch inst id as ass array
+                        $stmt = $pdo->prepare('INSERT INTO education
+                        (profile_id, institution_id, rank, year) 
+                    VALUES ( :pid, :iid, :rank, :year)');
+                    $stmt->execute(array(
+                        ':pid' => $_REQUEST['profile_id'],
+                        ':iid' => $inst_id,
+                        ':rank' => $i,
+                        ':year' => $year)
+                    );
+                    }
+                }
+            $rank++;
+            }  
             $_SESSION['success'] = "Record added";
             header("Location: index.php");
            // header ("location: edit.php?profile_id=".$_REQUEST['profile_id']);
@@ -126,6 +178,19 @@ $row = $stmt->fetch(PDO::FETCH_ASSOC);
 $stmt = $pdo->prepare("SELECT * FROM position where profile_id = :id");
 $stmt->execute(array(":id" => $_GET['profile_id']));
 $rows_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
+
+$stmt = $pdo->prepare("SELECT * FROM education where profile_id = :id order by rank");
+$stmt->execute(array(":id" => $_REQUEST['profile_id']));
+$rows_edu = $stmt->fetchALL(PDO::FETCH_ASSOC);
+
+//get inst names from inst table and put it in the array
+
+for ($i=0; $i<count($rows_edu); $i++) {
+    $stmt = $pdo->prepare("SELECT name FROM institution where institution_id = :id");
+    $stmt->execute(array(":id" => $rows_edu[$i]['institution_id']));
+    $inst_name = $stmt->fetch(PDO::FETCH_ASSOC);
+    $rows_edu[$i]['inst_name'] = $inst_name['name'];
+}
 
 ?>
     <html>
@@ -157,9 +222,31 @@ $summy = htmlentities($row['summary']);
 <input type="text" size="80" name="headline" value="<?= $hline ?>"></p>
 <p>Summary:<br>
 <textarea name="summary" rows="8" cols="80"><?= $summy ?></textarea></p>
-<p>Position: <input type="submit" id="addPos" value="+">
+<p>
+Education: <input type="submit" id="addEdu" value="+">
 </p>
-<?php //a bit of coding C:
+<p>
+Position: <input type="submit" id="addPos" value="+">
+</p>
+<div id="edu_fields"></div> <!--new education data before old -->
+<p></p>
+<?php //old educations 
+if ( isset($rows_edu)) {
+    foreach($rows_edu as $r) {
+        $n = htmlentities($r['rank']);
+        $edit_edu_year = htmlentities($r['year']);
+        $edit_inst_name = htmlentities($r['inst_name']);
+        echo('<div id="edu'.$n.'">
+        <p>Year: <input type="text" name="edu_year'.$n.'" value="'.$edit_edu_year.'" />
+        <input type="button" value="-"
+            onclick="$(\'#edu'.$n.'\').remove();return false;"><br>
+        <p>School: <input type="text" size="80" name="edu_school'.$n.'" class="school" value="'.$edit_inst_name.'"></div><p></p>');
+    }
+}
+?>
+<div id="position_fields"></div> <!--new positions before old -->
+<p></p>
+<?php //old positions
 if ( isset($rows_pos)) {
     foreach($rows_pos as $r) {
         $n = htmlentities($r['rank']);
@@ -169,16 +256,12 @@ if ( isset($rows_pos)) {
         <br><p>Year: <input type="text" name="year'.$n.'" value="'.$edit_year.'" />
         <input type="button" value="-"
             onclick="$(\'#position'.$n.'\').remove();return false;"></p>
-        <textarea name="desc'.$n.'" rows="8" cols="80">'.$edit_desc.'</textarea></div>');
+        <textarea name="desc'.$n.'" rows="8" cols="80">'.$edit_desc.'</textarea></div><p></p>');
     }
 }
-
 ?>
-<div id="position_fields"></div>
-<p></p>
 <p><input type="submit" value="Save"/>
 <input type="submit" name="cancel" value="Cancel"/></p>
-
 <script>
 countPos = <?= isset($rows_pos) ? count($rows_pos) : 0 ?>;
 window.console && console.log("Position started from "+countPos);
@@ -203,13 +286,40 @@ $(document).ready(function(){
             </div>');
     });
 });
+countEdu = <?= isset($rows_edu) ? count($rows_edu) : 0 ?>;
+$('#addEdu').click(function(event){
+        event.preventDefault();
+        if ( countEdu >= 9 ) {
+            alert("Maximum of nine education entries exceeded");
+            return;
+        }
+        countEdu++;
+        window.console && console.log("Adding education "+countEdu);
+
+        // Grab some HTML with hot spots and insert into the DOM
+        var source  = $("#edu-template").html();
+        $('#edu_fields').append(source.replace(/@COUNT@/g,countEdu));
+
+        // Add the even handler to the new ones
+        $('.school').autocomplete({
+            source: "school.php"
+        });
+
+    });
+
+    $('.school').autocomplete({
+        source: "school.php"
+    });
 </script>
-
-
-
+<script id="edu-template" type="text">
+  <div id="edu@COUNT@">
+    <p>Year: <input type="text" name="edu_year@COUNT@" value="" />
+    <input type="button" value="-" onclick="$('#edu@COUNT@').remove();return false;"><br>
+    <p>School: <input type="text" size="80" name="edu_school@COUNT@" class="school" value="" />
+    </p>
+  </div>
+</script>
 </form>
-
-
 </div>
 </body>
 </html>
