@@ -6,6 +6,7 @@ What can do:
 - login, logout as users;
 - search through profiles;
 - profiles are limited by 10 per "page". You can go next and back. Same with search results;
-- You can add positions for each profile, insert new pos for old profiles, delete, edit.
+- You can add positions for each profile, insert new pos for old profiles, delete, edit;
+- Added autocomplete for University selection (javascript).
  
- Boom! That's it for now.
+That's it for now.
